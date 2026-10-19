@@ -20,7 +20,7 @@ connectToDatabase();
 const app = express();
 
 app.use(cors({
-  origin:"employee-frontend-azure.vercel.app",
+  origin:"https://employee-frontend-azure.vercel.app/",
   credentials:true
 }));
 app.use(express.json());

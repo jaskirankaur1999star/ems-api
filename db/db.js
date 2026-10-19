@@ -1,17 +1,15 @@
+
 import mongoose from "mongoose";
 
 const connectToDatabase = async () => {
   try {
-    if (!process.env.MONGODB_URL) {
-      throw new Error("MONGODB_URL is missing");
+    const uri = process.env.MONGODB_URL;
+
+    if (!uri) {
+      throw new Error("MONGODB_URL is missing from .env");
     }
 
-    if (mongoose.connection.readyState === 1) {
-      return;
-    }
-
-    await mongoose.connect(process.env.MONGODB_URL);
-
+    await mongoose.connect(uri);
     console.log("Connected to Database");
   } catch (error) {
     console.error("Database connection failed:", error.message);

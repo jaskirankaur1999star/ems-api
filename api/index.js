@@ -1,14 +1,9 @@
 import app from "../index.js";
 import connectToDatabase from "../db/db.js";
 
-let isConnected = false;
-
 export default async function handler(req, res) {
   try {
-    if (!isConnected) {
-      await connectToDatabase();
-      isConnected = true;
-    }
+    await connectToDatabase();
 
     return app(req, res);
   } catch (error) {

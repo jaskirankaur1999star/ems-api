@@ -4,34 +4,169 @@ import bcrypt from "bcrypt";
 import User from "../models/User.js";
 import Employee from "../models/Employee.js";
 import mongoose from "mongoose";
+import uploadImage from "../db/gridfs.js";
 
 // ===============================
 // MULTER STORAGE
 // ===============================
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, "public/uploads");
-    },
 
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname));
-    },
-});
+// const storage = multer.diskStorage({
+//     destination: (req, file, cb) => {
+//         cb(null, "public/uploads");
+//     },
 
+//     filename: (req, file, cb) => {
+//         cb(null, Date.now() + path.extname(file.originalname));
+//     },
+// });
+
+// const upload = multer({
+//     storage: storage,
+// });
+
+// Grid fs
+const storage = multer.memoryStorage();
 const upload = multer({
-    storage: storage,
+    storage,
+    limits: {
+        fileSize: 5 * 1024 * 1024,
+    },
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = [
+            "image/jpeg",
+            "image/jpg",
+            "image/png",
+            "image/webp",
+        ];
+
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error("Only JPG, JPEG, PNG and WEBP images are allowed"));
+        }
+    },
 });
 
 // ===============================
 // ADD EMPLOYEE
 // ===============================
+// const addEmployee = async (req, res) => {
+//     try {
+//         console.log("========== REQUEST BODY ==========");
+//         console.log(req.body);
+
+//         console.log("========== FILE ==========");
+//         console.log(req.file);
+
+//         const {
+//             name,
+//             email,
+//             employeeId,
+//             dob,
+//             gender,
+//             maritalStatus,
+//             designation,
+//             department,
+//             salary,
+//             password,
+//             role,
+//         } = req.body;
+
+//         // Check required values
+//         if (
+//             !name ||
+//             !email ||
+//             !employeeId ||
+//             !department ||
+//             !salary ||
+//             !password ||
+//             !role
+//         ) {
+//             return res.status(400).json({
+//                 success: false,
+//                 error: "Required fields are missing",
+//             });
+//         }
+
+//         // Check existing user
+//         const existingUser = await User.findOne({ email });
+
+//         if (existingUser) {
+//             return res.status(400).json({
+//                 success: false,
+//                 error: "User already exists",
+//             });
+//         }
+
+//         // Check existing employee ID
+//         const existingEmployee = await Employee.findOne({ employeeId });
+
+//         if (existingEmployee) {
+//             return res.status(400).json({
+//                 success: false,
+//                 error: "Employee ID already exists",
+//             });
+//         }
+
+//         // Hash password
+//         const hashedPassword = await bcrypt.hash(password, 10);
+
+//         // Create User
+//         const user = new User({
+//             name,
+//             email,
+//             password: hashedPassword,
+//             role,
+//             profileImage: req.file ? req.file.filename : "",
+//         });
+
+//         const savedUser = await user.save();
+
+//         console.log("========== USER SAVED ==========");
+//         console.log(savedUser);
+
+//         // Create Employee
+//         const employee = new Employee({
+//             userId: savedUser._id,
+//             employeeId,
+//             dob,
+//             gender,
+//             maritalStatus,
+//             designation,
+//             department,
+//             salary: Number(salary),
+//         });
+
+//         const savedEmployee = await employee.save();
+
+//         console.log("========== EMPLOYEE SAVED ==========");
+//         console.log(savedEmployee);
+
+//         return res.status(201).json({
+//             success: true,
+//             message: "Employee Added Successfully",
+//             employee: savedEmployee,
+//         });
+
+//     } catch (error) {
+//         console.log("========== ERROR ==========");
+//         console.error(error);
+//         console.log("===========================");
+
+//         return res.status(500).json({
+//             success: false,
+//             error: error.message,
+//         });
+//     }
+// };
+
+
+// grid fs add employee
 const addEmployee = async (req, res) => {
     try {
-        console.log("========== REQUEST BODY ==========");
-        console.log(req.body);
-
-        console.log("========== FILE ==========");
-        console.log(req.file);
+        console.log("========== ADD EMPLOYEE ==========");
+        console.log("BODY:", req.body);
+        console.log("FILE:", req.file);
 
         const {
             name,
@@ -47,7 +182,7 @@ const addEmployee = async (req, res) => {
             role,
         } = req.body;
 
-        // Check required values
+        // Required fields
         if (
             !name ||
             !email ||
@@ -74,7 +209,9 @@ const addEmployee = async (req, res) => {
         }
 
         // Check existing employee ID
-        const existingEmployee = await Employee.findOne({ employeeId });
+        const existingEmployee = await Employee.findOne({
+            employeeId,
+        });
 
         if (existingEmployee) {
             return res.status(400).json({
@@ -86,19 +223,26 @@ const addEmployee = async (req, res) => {
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
 
+        // Upload image to MongoDB GridFS
+        let profileImage = "";
+
+        if (req.file) {
+            const imageId = await uploadImage(req.file);
+            profileImage = imageId.toString();
+
+            console.log("Image uploaded:", profileImage);
+        }
+
         // Create User
         const user = new User({
             name,
             email,
             password: hashedPassword,
             role,
-            profileImage: req.file ? req.file.filename : "",
+            profileImage,
         });
 
         const savedUser = await user.save();
-
-        console.log("========== USER SAVED ==========");
-        console.log(savedUser);
 
         // Create Employee
         const employee = new Employee({
@@ -114,9 +258,6 @@ const addEmployee = async (req, res) => {
 
         const savedEmployee = await employee.save();
 
-        console.log("========== EMPLOYEE SAVED ==========");
-        console.log(savedEmployee);
-
         return res.status(201).json({
             success: true,
             message: "Employee Added Successfully",
@@ -124,13 +265,13 @@ const addEmployee = async (req, res) => {
         });
 
     } catch (error) {
-        console.log("========== ERROR ==========");
+        console.error("========== ADD EMPLOYEE ERROR ==========");
         console.error(error);
-        console.log("===========================");
+        console.error("========================================");
 
         return res.status(500).json({
             success: false,
-            error: error.message,
+            error: error.message || "Failed to add employee",
         });
     }
 };
@@ -447,13 +588,64 @@ export const deleteEmployee = async (req, res) => {
     }
 };
 
+const getEmployeeImage = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).send("Invalid image ID");
+        }
+
+        const db = mongoose.connection.db;
+
+        const bucket = new mongoose.mongo.GridFSBucket(db, {
+            bucketName: "employeeImages",
+        });
+
+        const files = await db
+            .collection("employeeImages.files")
+            .find({
+                _id: new mongoose.Types.ObjectId(id),
+            })
+            .toArray();
+
+        if (!files.length) {
+            return res.status(404).send("Image not found");
+        }
+
+        const file = files[0];
+
+        res.set(
+            "Content-Type",
+            file.contentType || "image/jpeg"
+        );
+
+        const downloadStream = bucket.openDownloadStream(
+            new mongoose.Types.ObjectId(id)
+        );
+
+        downloadStream.on("error", (error) => {
+            console.error("Image download error:", error);
+            res.status(500).end();
+        });
+
+        downloadStream.pipe(res);
+
+    } catch (error) {
+        console.error("GET EMPLOYEE IMAGE ERROR:", error);
+
+        return res.status(500).send("Unable to load image");
+    }
+};
+
 export {
     addEmployee,
     upload,
     getEmployees,
     getEmployee,
     updateEmployee,
-    fetchEmployeesByDepId
+    fetchEmployeesByDepId,
+    getEmployeeImage
 };
 
 
